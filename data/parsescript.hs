@@ -31,7 +31,7 @@ parseRawLine line@(c:_)
     | c == '['  = Scene $ contents line
     | c == '('  = StageDirection $ contents line
     | otherwise = Line (head parsedLine) (intercalate ":" $ tail parsedLine)
-        where parsedLine = if length candidates > 0
+        where parsedLine = if not (null candidates)
                                then head candidates
                                else ["UNKNOWN", line]
                   where colon = splitOn ": " line
@@ -55,7 +55,7 @@ main = do
 
     -- Extract the appropriate tags from the text.
     dialogue <- runX $ doc >>> css "table p font" //> getText
-    mapM_ print . (map parseRawLine) . (filter $ not . null) . (map $ strip . unnewline) $ dialogue
+    mapM_ (print . parseRawLine) . filter (not . null) . map (strip . unnewline) $ dialogue
 
     -- Yay!
     exitSuccess
