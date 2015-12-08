@@ -1,5 +1,7 @@
 import Control.Monad
 import Data.Functor
+import Data.List
+import Data.List.Split
 import Data.String.Utils
 import Prelude hiding (readFile, putStrLn, print)
 import System.Environment
@@ -16,10 +18,26 @@ unnewline = map nlToSpace
           nlToSpace '\n' = ' '
           nlToSpace c = c
 
-unnewline' :: String -> String
-unnewline' "" = ""
-unnewline' ('\n':cs) = ' ':(unnewline cs)
-unnewline' (c:cs) = c:(unnewline cs)
+-- Data type representing lines in script.
+data ScriptLine = StageDirection String | Scene String | Line String String
+
+instance Show ScriptLine where
+    show (StageDirection dir) = intercalate "" ["(", dir, ")"]
+    show (Scene scene) = intercalate "" ["[", scene, "]"]
+    show (Line role line) = intercalate ": " [role, line]
+
+parseRawLine :: String -> ScriptLine
+parseRawLine line@(c:_)
+    | c == '['  = Scene $ contents line
+    | c == '('  = StageDirection $ contents line
+    | otherwise = Line (head parsedLine) (intercalate ":" $ tail parsedLine)
+        where parsedLine = if length candidates > 0
+                               then head candidates
+                               else ["UNKNOWN", line]
+                  where colon = splitOn ": " line
+                        semicolon = splitOn "; " line
+                        candidates = filter (\x -> length x > 1) [colon, semicolon]
+              contents = init . tail
 
 main :: IO ()
 main = do
@@ -37,7 +55,7 @@ main = do
 
     -- Extract the appropriate tags from the text.
     dialogue <- runX $ doc >>> css "table p font" //> getText
-    mapM_ putStrLn $ map (strip . unnewline) dialogue
+    mapM_ print . (map parseRawLine) . (filter $ not . null) . (map $ strip . unnewline) $ dialogue
 
     -- Yay!
     exitSuccess

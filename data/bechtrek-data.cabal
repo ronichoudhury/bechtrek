@@ -22,6 +22,7 @@ executable bechtrek-data
                        hxt >= 9.3,
                        HandsomeSoup >= 0.4,
                        MissingH >= 1.3,
+                       split >= 0.2,
                        utf8-string >= 0.3
   -- hs-source-dirs:      
   default-language:    Haskell2010
