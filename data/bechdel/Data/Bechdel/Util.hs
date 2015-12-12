@@ -1,4 +1,4 @@
-module Data.BechTrek.Util where
+module Data.Bechdel.Util where
 
 -- Replace newlines with spaces.
 unnewline :: String -> String

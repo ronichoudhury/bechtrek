@@ -1,6 +1,6 @@
 import Control.Monad
-import Data.BechTrek
-import Data.BechTrek.Util
+import Data.Bechdel
+import Data.Bechdel.Util
 import Data.Functor
 import Data.List
 import Data.String.Utils

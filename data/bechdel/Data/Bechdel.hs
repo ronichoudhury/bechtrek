@@ -1,4 +1,4 @@
-module Data.BechTrek where
+module Data.Bechdel where
 import Data.List
 import Data.List.Split
 import Text.XML.HXT.Core hiding (when)
