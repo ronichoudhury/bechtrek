@@ -1,22 +1,8 @@
-import Control.Monad
-import Data.Functor
+module Data.Bechdel where
 import Data.List
 import Data.List.Split
-import Data.String.Utils
-import Prelude hiding (readFile, putStrLn, print)
-import System.Environment
-import System.Exit
-import System.IO.UTF8
-import System.IO (stderr)
 import Text.XML.HXT.Core hiding (when)
 import Text.HandsomeSoup
-
--- Replace newlines with spaces.
-unnewline :: String -> String
-unnewline = map nlToSpace
-    where nlToSpace :: Char -> Char
-          nlToSpace '\n' = ' '
-          nlToSpace c = c
 
 -- Data type representing lines in script.
 data ScriptLine = StageDirection String | Scene String | Line String String
@@ -26,6 +12,7 @@ instance Show ScriptLine where
     show (Scene scene) = intercalate "" ["[", scene, "]"]
     show (Line role line) = intercalate ": " [role, line]
 
+-- Parse a script line from a line of text.
 parseRawLine :: String -> ScriptLine
 parseRawLine line@(c:_)
     | c == '['  = Scene $ contents line
@@ -39,23 +26,11 @@ parseRawLine line@(c:_)
                         candidates = filter (\x -> length x > 1) [colon, semicolon]
               contents = init . tail
 
-main :: IO ()
-main = do
-    -- Process command line arguments.
-    args <- getArgs
-    when (null args) $ do
-        hPutStrLn stderr "usage: parsescript <scriptfile>"
-        exitFailure
+-- Parse HTML text.
+parseHTML = readString [withParseHTML yes, withWarnings no]
 
-    -- Open the file and read its contents.
-    text <- readFile $ head args
+-- Extract all appropriate text nodes comprising script.
+extractScriptText html = runX $ html >>> css "table p font" //> getText
 
-    -- Parse the HTML out.
-    let doc = readString [withParseHTML yes, withWarnings no] text
-
-    -- Extract the appropriate tags from the text.
-    dialogue <- runX $ doc >>> css "table p font" //> getText
-    mapM_ (print . parseRawLine) . filter (not . null) . map (strip . unnewline) $ dialogue
-
-    -- Yay!
-    exitSuccess
+-- Convenience function.
+readHTMLScript = extractScriptText . parseHTML
