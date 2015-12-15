@@ -20,10 +20,7 @@ library
   exposed-modules:     Data.Bechdel
                        Data.Bechdel.Util
 
-  build-depends:       base >=4.7 && <4.8,
-                       hxt >= 9.3,
-                       HandsomeSoup >= 0.4,
-                       split >= 0.2
+  build-depends:       base >=4.7 && <4.8
 
   default-language:    Haskell2010
 
@@ -31,6 +28,9 @@ executable parsescript
   main-is:             startrek/parsescript.hs
   build-depends:       base >=4.7 && <4.8,
                        bechdel,
+                       hxt >= 9.3,
+                       HandsomeSoup >= 0.4,
                        MissingH >=1.3,
-                       utf8-string >= 0.3
+                       utf8-string >= 0.3,
+                       split >= 0.2
   default-language:    Haskell2010

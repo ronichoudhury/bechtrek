@@ -1,36 +1,52 @@
 module Data.Bechdel where
 import Data.List
-import Data.List.Split
-import Text.XML.HXT.Core hiding (when)
-import Text.HandsomeSoup
+import Data.Maybe
+
+class Repr a where
+  repr :: a -> String
+
+data Gender = Male | Female | Neither
+
+instance Show Gender where
+    show Male = "male"
+    show Female = "female"
+    show Neither = "neither"
+
+-- Data type representing a character in a show.
+data Role = Role
+    { name   :: String
+    , gender :: Maybe Gender
+    , note   :: Maybe String
+    }
+
+instance Repr Role where
+    repr (Role name gender note) = intercalate "" [ "Role("
+                                                  , name , ", "
+                                                  , genderStr
+                                                  , noteStr, ")"
+                                                  ]
+      where
+        genderStr = maybe "unknown" show gender
+        noteStr = maybe "" (", "++) note
+
+instance Show Role where
+    show role = name role ++ "(" ++ genderStr ++ ")" ++ noteStr
+      where
+        genderStr = case gender role of
+            Just Male ->   "m"
+            Just Female -> "f"
+            Nothing ->     "u"
+        noteStr = maybe "" (\x -> concat ["[", x, "]"]) $ note role
 
 -- Data type representing lines in script.
-data ScriptLine = StageDirection String | Scene String | Line String String
+data ScriptLine = StageDirection String | Scene String | Line Role String
+
+instance Repr ScriptLine where
+    repr (StageDirection dir) = "StageDirection(" ++ dir ++ ")"
+    repr (Scene scene) = "Scene(" ++ scene ++ ")"
+    repr (Line role line) = "Line(" ++ show role ++ ", " ++ line ++ ")"
 
 instance Show ScriptLine where
     show (StageDirection dir) = intercalate "" ["(", dir, ")"]
     show (Scene scene) = intercalate "" ["[", scene, "]"]
-    show (Line role line) = intercalate ": " [role, line]
-
--- Parse a script line from a line of text.
-parseRawLine :: String -> ScriptLine
-parseRawLine line@(c:_)
-    | c == '['  = Scene $ contents line
-    | c == '('  = StageDirection $ contents line
-    | otherwise = Line (head parsedLine) (intercalate ":" $ tail parsedLine)
-        where parsedLine = if not (null candidates)
-                               then head candidates
-                               else ["UNKNOWN", line]
-                  where colon = splitOn ": " line
-                        semicolon = splitOn "; " line
-                        candidates = filter (\x -> length x > 1) [colon, semicolon]
-              contents = init . tail
-
--- Parse HTML text.
-parseHTML = readString [withParseHTML yes, withWarnings no]
-
--- Extract all appropriate text nodes comprising script.
-extractScriptText html = runX $ html >>> css "table p font" //> getText
-
--- Convenience function.
-readHTMLScript = extractScriptText . parseHTML
+    show (Line role line) = intercalate ": " [show role, line]
