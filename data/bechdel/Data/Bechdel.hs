@@ -20,12 +20,9 @@ data Role = Role
     }
 
 instance Repr Role where
-    repr (Role name gender note) = intercalate "" [ "Role("
-                                                  , name , ", "
-                                                  , genderStr
-                                                  , noteStr, ")"
-                                                  ]
+    repr (Role name gender note) = intercalate "" parts
       where
+        parts = ["Role(", name, ", ", genderStr, noteStr, ")"]
         genderStr = maybe "unknown" show gender
         noteStr = maybe "" (", "++) note
 
