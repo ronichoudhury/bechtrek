@@ -5,11 +5,10 @@ import Data.Functor
 import Data.List
 import Data.List.Split
 import Data.String.Utils
-import Prelude hiding (readFile, putStrLn, print)
 import System.Environment
 import System.Exit
-import System.IO.UTF8
-import System.IO (stderr)
+import System.IO (latin1)
+import System.IO (stdin, hSetEncoding)
 import Text.XML.HXT.Core hiding (when)
 import Text.HandsomeSoup
 
@@ -50,22 +49,15 @@ readHTMLScript = extractScriptText . parseHTML
 -- spit them back onto stdout.
 main :: IO ()
 main = do
-    -- Process command line arguments.
-    args <- getArgs
-    when (null args) $ do
-        hPutStrLn stderr "usage: parsescript <scriptfile>"
-        exitFailure
 
-    -- Open the file and read its contents.
-    text <- readFile $ head args
-
-    -- Read out the script text from the file.
-    let script = readHTMLScript text
+    -- Open the file, read its contents, and parse out the script lines from the
+    -- HTML.
+    hSetEncoding stdin latin1
+    script <- readHTMLScript <$> getContents
 
     -- Extract the appropriate tags from the text.
     scriptLines <- map parseRawLine . filter (not . null) . map (strip . unnewline) <$> script
 
+    -- Print out the script in standard format.
     mapM_ print scriptLines
-
-    -- Yay!
     exitSuccess
