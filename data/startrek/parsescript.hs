@@ -29,7 +29,7 @@ parseRawLine s = parse parser s s
 
     lineParser = do
         role <- parseRawRole
-        char ':'
+        char ':' <|> char ';'
         spaces
         line <- many anyChar
         return $ Line role line
