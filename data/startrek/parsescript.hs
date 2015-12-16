@@ -7,34 +7,38 @@ import Data.List.Split
 import Data.String.Utils
 import System.Environment
 import System.Exit
-import System.IO (latin1)
-import System.IO (stdin, hSetEncoding)
+import System.IO
 import Text.XML.HXT.Core hiding (when)
 import Text.HandsomeSoup
+import Text.ParserCombinators.Parsec
 
 -- Parse a script line from a line of text.
-parseRawLine :: String -> ScriptLine
-parseRawLine line@(c:_)
-    | c == '['  = Scene $ contents line
-    | c == '('  = StageDirection $ contents line
-    | otherwise = Line (parseRole $ head parsedLine) (intercalate ":" $ tail parsedLine)
-        where parsedLine = if not (null candidates)
-                               then head candidates
-                               else ["UNKNOWN", line]
-                  where colon = splitOn ": " line
-                        semicolon = splitOn "; " line
-                        candidates = filter (\x -> length x > 1) [colon, semicolon]
-              contents = init . tail
-
--- Parse a string into a role.
-parseRole :: String -> Role
-parseRole s = Role name Nothing note
+parseRawLine :: String -> Either ParseError ScriptLine
+parseRawLine s = parse parser s s
   where
-    name = head parts
-    note = case length parts of
-        1 -> Nothing
-        _ -> Just $ init . head . tail $ parts
-    parts = splitOn " [" s
+    parser = try stagedirParser <|> try sceneParser <|> try lineParser
+
+    stagedirParser = do
+        char '('
+        text <- manyTill anyChar (try $ lookAhead (char ')' >> eof))
+        return $ StageDirection text
+
+    sceneParser = do
+        text <- between (char '[') (char ']') (many $ noneOf "[]")
+        return $ Scene text
+
+    lineParser = do
+        role <- parseRawRole
+        char ':'
+        spaces
+        line <- many anyChar
+        return $ Line role line
+
+    parseRawRole = do
+        name <- many letter
+        spaces
+        note <- optionMaybe $ between (char '[') (char ']') (many $ noneOf "[]")
+        return $ Role name Nothing note
 
 -- Parse HTML text.
 parseHTML = readString [withParseHTML yes, withWarnings no]
@@ -45,11 +49,19 @@ extractScriptText html = runX $ html >>> css "table p font" //> getText
 -- Convenience function.
 readHTMLScript = extractScriptText . parseHTML
 
+report :: Either ParseError ScriptLine -> IO Bool
+report (Left parseError) = do
+    hPutStrLn stderr "ERROR-------"
+    hPutStrLn stderr $ show parseError
+    return False
+report (Right result) = do
+    putStrLn $ format result
+    return True
+
 -- Main function: open the file, read its contents, parse into ScriptLines, and
 -- spit them back onto stdout.
 main :: IO ()
 main = do
-
     -- Open the file, read its contents, and parse out the script lines from the
     -- HTML.
     hSetEncoding stdin latin1
@@ -59,5 +71,7 @@ main = do
     scriptLines <- map parseRawLine . filter (not . null) . map (strip . unnewline) <$> script
 
     -- Print out the script in standard format.
-    mapM_ print scriptLines
-    exitSuccess
+    good <- mapM report scriptLines
+    if all (== True) good
+        then exitSuccess
+        else exitFailure
