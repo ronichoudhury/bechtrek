@@ -24,7 +24,7 @@ parseRawLine s = parse parser s s
         return $ StageDirection text
 
     sceneParser = do
-        text <- between (char '[') (char ']') (many $ noneOf "[]")
+        text <- between (char '[' <|> char '{') (char ']' <|> char '}') (many $ noneOf "[]{}")
         return $ Scene text
 
     lineParser = do
@@ -37,7 +37,7 @@ parseRawLine s = parse parser s s
     parseRawRole = do
         name <- many letter
         spaces
-        note <- optionMaybe $ between (char '[') (char ']') (many $ noneOf "[]")
+        note <- optionMaybe $ between (char '[' <|> char '{') (char ']' <|> char '}') (many $ noneOf "[]{}")
         return $ Role name Nothing note
 
 -- Parse HTML text.
