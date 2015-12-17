@@ -16,11 +16,11 @@ import Text.ParserCombinators.Parsec
 parseRawLine :: String -> Either ParseError ScriptLine
 parseRawLine s = parse parser s s
   where
-    parser = try stagedirParser <|> try sceneParser <|> try lineParser
+    parser = try stagedirParser <|> try sceneParser <|> try lineParser <|> try logParser
 
     stagedirParser = do
         char '('
-        text <- manyTill anyChar (try $ lookAhead (char ')' >> eof))
+        text <- manyTill anyChar (try $ lookAhead (char ')' >> spaces >> eof))
         return $ StageDirection text
 
     sceneParser = do
@@ -34,8 +34,19 @@ parseRawLine s = parse parser s s
         line <- many anyChar
         return $ Line role line
 
+    logParser = do
+        text <- many anyChar
+        if isLog text
+            then return $ Line (Role "UNKNOWN" Nothing Nothing) text
+            else fail "Could not parse"
+      where
+        isLog s = any (== True) $ map ($s) [isInfixOf "Star date",
+                                            isInfixOf "Stardate",
+                                            isInfixOf "'s log",
+                                            isInfixOf "'s personal log"]
+
     parseRawRole = do
-        name <- many letter
+        name <- many $ noneOf ":;[{"
         spaces
         note <- optionMaybe $ between (char '[' <|> char '{') (char ']' <|> char '}') (many $ noneOf "[]{}")
         return $ Role name Nothing note
@@ -53,6 +64,7 @@ report :: Either ParseError ScriptLine -> IO Bool
 report (Left parseError) = do
     hPutStrLn stderr "ERROR-------"
     hPutStrLn stderr $ show parseError
+    hFlush stderr
     return False
 report (Right result) = do
     putStrLn $ format result
@@ -71,7 +83,7 @@ main = do
     scriptLines <- map parseRawLine . filter (not . null) . map (strip . unnewline) <$> script
 
     -- Print out the script in standard format.
-    good <- mapM report scriptLines
+    good <- mapM report $ scriptLines
     if all (== True) good
         then exitSuccess
         else exitFailure
