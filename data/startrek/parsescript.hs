@@ -18,9 +18,16 @@ parseRawLine s = parse parser s s
   where
     parser = try stagedirParser <|> try sceneParser <|> try lineParser <|> try logParser
 
-    stagedirParser = do
+    stagedirParser = try stagedirParserWhole <|> try stagedirParserMissingParen
+
+    stagedirParserWhole = do
         char '('
         text <- manyTill anyChar (try $ lookAhead (char ')' >> spaces >> eof))
+        return $ StageDirection text
+
+    stagedirParserMissingParen = do
+        char '('
+        text <- many anyChar
         return $ StageDirection text
 
     sceneParser = do
