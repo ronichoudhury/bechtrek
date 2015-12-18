@@ -49,13 +49,13 @@ parseRawLine s = parse parser s s
       where
         isLog s = any (== True) $ map ($s) [isInfixOf "Star date",
                                             isInfixOf "Stardate",
-                                            isInfixOf "'s log",
-                                            isInfixOf "'s personal log"]
+                                            isInfixOf "log",
+                                            isInfixOf "Log"]
 
     parseRawRole = do
         name <- many $ noneOf ":;[{"
         spaces
-        note <- optionMaybe $ between (char '[' <|> char '{') (char ']' <|> char '}') (many $ noneOf "[]{}")
+        note <- optionMaybe $ between (char '[' <|> char '{') (char ']' <|> char '[' <|> char '}') (many $ noneOf "[]{}")
         return $ Role name Nothing note
 
 -- Parse HTML text.
