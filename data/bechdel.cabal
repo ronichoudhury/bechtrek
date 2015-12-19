@@ -35,3 +35,9 @@ executable parsechakoteya
                        parsec >=3.1,
                        split >= 0.2
   default-language:    Haskell2010
+
+executable repair
+  main-is:             startrek/repair.hs
+  build-depends:       base >=4.7 && <4.8,
+                       bechdel
+  default-language:    Haskell2010

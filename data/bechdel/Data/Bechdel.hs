@@ -87,7 +87,8 @@ parseLine = do
 -- Parse a ScriptLine out of a stage direction.
 parseStageDirection :: GenParser Char () ScriptLine
 parseStageDirection = do
-    text <- between (char '(') (char ')') (many $ noneOf "()")
+    char '('
+    text <- manyTill anyChar (try $ lookAhead (char ')' >> spaces >> eof))
     return $ StageDirection text
 
 parseScene :: GenParser Char () ScriptLine
