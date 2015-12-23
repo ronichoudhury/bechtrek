@@ -1,6 +1,7 @@
 module Data.Bechdel where
 import Data.List
 import Data.Maybe
+import Data.String.Utils
 import Text.ParserCombinators.Parsec
 
 -- Used to print data into a standard format.
@@ -40,6 +41,7 @@ instance Format Role where
         genderStr = case gender role of
             Just Male ->   "m"
             Just Female -> "f"
+            Just Neither -> "n"
             Nothing ->     "u"
         noteStr = maybe "" (\x -> concat ["[", x, "]"]) $ note role
 
@@ -62,7 +64,7 @@ parseRole = do
     name <- manyTill anyChar (lookAhead $ char '(')
     genderLetter <- between (char '(') (char ')') $ oneOf "mfnu"
     note <- optionMaybe $ between (char '[') (char ']') (many $ noneOf "[]")
-    return $ Role name (gender genderLetter) note
+    return $ Role (strip name) (gender genderLetter) note
   where
     gender :: Char -> Maybe Gender
     gender genderLetter = case genderLetter of
@@ -87,7 +89,8 @@ parseLine = do
 -- Parse a ScriptLine out of a stage direction.
 parseStageDirection :: GenParser Char () ScriptLine
 parseStageDirection = do
-    text <- between (char '(') (char ')') (many $ noneOf "()")
+    char '('
+    text <- manyTill anyChar (try $ lookAhead (char ')' >> spaces >> eof))
     return $ StageDirection text
 
 parseScene :: GenParser Char () ScriptLine
