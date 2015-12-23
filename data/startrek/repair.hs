@@ -2,6 +2,7 @@ import Control.Monad
 import Data.Bechdel
 import Data.Either
 import Data.Functor
+import qualified Data.Map as M
 import System.Environment
 import System.Exit
 import System.IO
@@ -15,6 +16,44 @@ fillName l@(Line r@Role{name="UNKNOWN"} s) = do
     name <- getLine
     return $ Line r{name=name} s
 fillName r = return r
+
+-- Ask the user for a gender if one is missing; use the map to store cached
+-- previous answers.
+fillGender :: M.Map String Gender -> ScriptLine -> IO (M.Map String Gender, ScriptLine)
+fillGender cache l@(Line r@Role{gender=Nothing} s) = do
+    case M.lookup (name r) cache of
+        Just g  -> hPutStrLn stderr "bingo" >> return (cache, Line r{gender=Just g} s)
+        Nothing -> do
+            hPutStrLn stderr $ format l
+            hPutStr stderr "What is the role's gender? "
+            hFlush stderr
+            g <- translate . head <$> getLine
+            let newCache = M.insert (name r) g cache
+            return (newCache, Line r{gender=Just g} s)
+  where
+    translate :: Char -> Gender
+    translate 'm' = Male
+    translate 'f' = Female
+    translate 'n' = Neither
+    translate c = error $ "Illegal character for gender: " ++ show c
+fillGender cache l@(Line r@Role{gender=Just g} s) = return (M.insert (name r) g cache, l)
+fillGender cache l = return (cache, l)
+
+-- Apply fillGender to a list of ScriptLines, threading the evolving cache
+-- through the invocations.
+--
+-- TODO: replace this one-off mechanism with a use of StateT monad.
+fillGenders :: [ScriptLine] -> IO [ScriptLine]
+fillGenders = go (M.fromList [])
+  where
+    go :: M.Map String Gender -> [ScriptLine] -> IO [ScriptLine]
+    go _ [] = return []
+    go cache (x:xs) = do
+        result <- fillGender cache x
+        let newCache = fst result
+        let value = snd result
+        rest <- go newCache xs
+        return $ value : rest
 
 main :: IO ()
 main = do
@@ -40,6 +79,9 @@ main = do
     -- Find script lines with characters with unknown names.
     namedScript <- mapM fillName script
 
-    mapM_ (putStrLn . format) namedScript
+    -- Find script lines with characters with unknown gender.
+    genderedNamedScript <- fillGenders namedScript
+
+    mapM_ (putStrLn . format) genderedNamedScript
 
     exitSuccess
