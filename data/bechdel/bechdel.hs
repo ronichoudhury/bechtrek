@@ -32,10 +32,8 @@ countDistinct lines = countDistinct' lines S.empty 0
     countDistinct' :: [ScriptLine] -> S.Set String -> Int -> Int
     countDistinct' [] _ c = c
     countDistinct' (x:xs) s c =
-        if isFemale x
-            then if S.member rolename s
-                     then countDistinct' xs s c
-                     else countDistinct' xs (S.insert rolename s) (c + 1)
+        if isFemale x && S.notMember rolename s
+            then countDistinct' xs (S.insert rolename s) (c + 1)
             else countDistinct' xs s c
       where
         rolename = name . role $ x
@@ -49,9 +47,10 @@ askBechdel scene = do
         then return False
         else do
             mapM_ (putStrLn . format) scene
-            putStr "Does this scene pass the Bechdel test? "
+            putStr "\nDoes this scene pass the Bechdel test? "
             hFlush stdout
             answer <- getLine
+            putStrLn ""
             return $ (null answer) || case head answer of
                 'y' -> True
                 otherwise -> False

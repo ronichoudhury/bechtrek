@@ -36,7 +36,7 @@ instance Show Role where
         surroundParen = ("("++) . (++")")
 
 instance Format Role where
-    format role = name role ++ "(" ++ genderStr ++ ")" ++ noteStr
+    format role = colorStr ++ name role ++ "(" ++ genderStr ++ ")" ++ noteStr ++ clearStr
       where
         genderStr = case gender role of
             Just Male ->   "m"
@@ -44,6 +44,10 @@ instance Format Role where
             Just Neither -> "n"
             Nothing ->     "u"
         noteStr = maybe "" (\x -> concat ["[", x, "]"]) $ note role
+        colorStr = case gender role of
+            Just Female -> "\x1b[1;91m"
+            otherwist -> ""
+        clearStr = "\x1b[0m"
 
 -- Data type representing lines in script.
 data ScriptLine = StageDirection String | Scene String | Line Role String
@@ -55,7 +59,10 @@ instance Show ScriptLine where
 
 instance Format ScriptLine where
     format (StageDirection dir) = intercalate "" ["(", dir, ")"]
-    format (Scene scene) = intercalate "" ["[", scene, "]"]
+    format (Scene scene) = intercalate "" [colorStr, "[", scene, "]", clearStr]
+      where
+        colorStr = "\x1b[1;94m"
+        clearStr = "\x1b[0m"
     format (Line role line) = intercalate ": " [format role, line]
 
 -- Parse a role from a string.
