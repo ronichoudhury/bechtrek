@@ -28,7 +28,7 @@ data Role = Role
     }
 
 instance Show Role where
-    show (Role name gender note) = "(" ++ (intercalate " " $ parts) ++ ")"
+    show (Role name gender note) = "(" ++ unwords parts ++ ")"
       where
         parts = ["Role", show name, genderStr, noteStr]
         genderStr = maybe "Nothing" (surroundParen . ("Just "++) . show) gender

@@ -51,7 +51,7 @@ askBechdel scene = do
             hFlush stderr
             answer <- getLine
             hPutStrLn stderr ""
-            return $ (null answer) || case head answer of
+            return $ null answer || case head answer of
                 'y' -> True
                 otherwise -> False
 
