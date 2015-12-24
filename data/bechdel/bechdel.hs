@@ -3,6 +3,7 @@ import Data.Bechdel
 import Data.Either
 import Data.Functor
 import Data.List.Split
+import qualified Data.Set as S
 import Data.Typeable
 import System.Environment
 import System.Exit
@@ -19,16 +20,25 @@ isFemale :: ScriptLine -> Bool
 isFemale (Line r@Role{gender=Just Female} _) = True
 isFemale _ = False
 
+-- Extract a role from a ScriptLine (dangerous function but we only call it on a
+-- list that is known to contain only Line objects).
+role :: ScriptLine -> Role
+role (Line r _) = r
+
 -- Counter for number of distinct, female roles in a scene.
 countDistinct :: [ScriptLine] -> Int
-countDistinct lines = countDistinct' lines 0
+countDistinct lines = countDistinct' lines S.empty 0
   where
-    countDistinct' :: [ScriptLine] -> Int -> Int
-    countDistinct' [] c = c
-    countDistinct' (x:xs) c =
+    countDistinct' :: [ScriptLine] -> S.Set String -> Int -> Int
+    countDistinct' [] _ c = c
+    countDistinct' (x:xs) s c =
         if isFemale x
-            then countDistinct' xs (c + 1)
-            else countDistinct' xs c
+            then if S.member rolename s
+                     then countDistinct' xs s c
+                     else countDistinct' xs (S.insert rolename s) (c + 1)
+            else countDistinct' xs s c
+      where
+        rolename = name . role $ x
 
 -- This function filters away all scenes that have fewer than two female
 -- characters, and asks the user whether it passes the Bechdel test.
