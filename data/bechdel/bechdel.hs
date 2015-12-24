@@ -46,11 +46,11 @@ askBechdel scene = do
     if numFemale < 2
         then return False
         else do
-            mapM_ (putStrLn . format) scene
-            putStr "\nDoes this scene pass the Bechdel test? "
-            hFlush stdout
+            mapM_ (hPutStrLn stderr . format) scene
+            hPutStr stderr "\nDoes this scene pass the Bechdel test? "
+            hFlush stderr
             answer <- getLine
-            putStrLn ""
+            hPutStrLn stderr ""
             return $ (null answer) || case head answer of
                 'y' -> True
                 otherwise -> False
