@@ -45,7 +45,7 @@ fillGender cache l = return (cache, l)
 --
 -- TODO: replace this one-off mechanism with a use of StateT monad.
 fillGenders :: [ScriptLine] -> IO [ScriptLine]
-fillGenders = go (M.fromList [])
+fillGenders = go castGenders
   where
     go :: M.Map String Gender -> [ScriptLine] -> IO [ScriptLine]
     go _ [] = return []
@@ -55,6 +55,20 @@ fillGenders = go (M.fromList [])
         let value = snd result
         rest <- go newCache xs
         return $ value : rest
+
+castGenders :: M.Map String Gender
+castGenders = M.fromList [("PICARD", Male)
+                         ,("RIKER", Male)
+                         ,("DATA", Male)
+                         ,("WORF", Male)
+                         ,("COMPUTER", Neither)
+                         ,("CRUSHER", Female)
+                         ,("TROI", Female)
+                         ,("WESLEY", Male)
+                         ,("TASHA", Female)
+                         ,("LAFORGE", Male)
+                         ,("Q", Male)
+                         ,("Q {JUDGE}", Male)]
 
 main :: IO ()
 main = do
