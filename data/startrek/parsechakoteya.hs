@@ -53,7 +53,7 @@ parseRawLine s = parse parser s s
                                             isInfixOf "Log"]
 
     parseRawRole = do
-        name <- many $ noneOf ":;[{"
+        name <- many $ noneOf ":;["
         spaces
         note <- optionMaybe $ between (char '[' <|> char '{') (char ']' <|> char '[' <|> char '}') (many $ noneOf "[]{}")
         return $ Role name Nothing note
