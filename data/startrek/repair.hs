@@ -1,5 +1,6 @@
 import Control.Monad
 import Data.Bechdel
+import Data.Char
 import Data.Either
 import Data.Functor
 import qualified Data.Map as M
@@ -13,7 +14,7 @@ fillName l@(Line r@Role{name="UNKNOWN"} s) = do
     hPutStrLn stderr $ format l
     hPutStr stderr "What is the role's name? "
     hFlush stderr
-    name <- getLine
+    name <- map toUpper <$> getLine
     return $ Line r{name=name} s
 fillName r = return r
 
