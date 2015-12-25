@@ -71,7 +71,7 @@ instance Format ScriptLine where
       where
         colorStr = if color then "\x1b[1;94m" else ""
         clearStr = if color then "\x1b[0m" else ""
-    rawformat _ (Line role line) = intercalate ": " [format role, line]
+    rawformat color (Line role line) = intercalate ": " [rawformat color role, line]
 
 -- Parse a role from a string.
 parseRole :: GenParser Char () Role
