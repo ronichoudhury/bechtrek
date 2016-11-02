@@ -46,7 +46,7 @@ askBechdel scene = do
     if numFemale < 2
         then return False
         else do
-            mapM_ (hPutStrLn stderr . format) scene
+            mapM_ (hPutStrLn stderr . cformat) scene
             hPutStr stderr "\nDoes this scene pass the Bechdel test? "
             hFlush stderr
             answer <- getLine

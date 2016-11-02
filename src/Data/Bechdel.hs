@@ -4,11 +4,18 @@ import Data.Maybe
 import Data.String.Utils
 import Text.ParserCombinators.Parsec
 
--- Used to print data into a standard format.
+-- Used to print data into a standard format. The boolean parameter controls
+-- whether the formatting is done using color or not.
 class Format a where
-  format :: a -> String
+  rawformat :: Bool -> a -> String
 
-data Gender = Male | Female | Neither
+  format :: a -> String
+  format = rawformat False
+
+  cformat :: a -> String
+  cformat = rawformat True
+
+data Gender = Male | Female | Neither deriving Eq
 
 instance Show Gender where
     show Male = "Male"
@@ -16,9 +23,9 @@ instance Show Gender where
     show Neither = "Neither"
 
 instance Format Gender where
-    format Male = "(m)"
-    format Female = "(f)"
-    format Neither = "(n)"
+    rawformat _ Male = "(m)"
+    rawformat _ Female = "(f)"
+    rawformat _ Neither = "(n)"
 
 -- Data type representing a character in a show.
 data Role = Role
@@ -36,7 +43,7 @@ instance Show Role where
         surroundParen = ("("++) . (++")")
 
 instance Format Role where
-    format role = colorStr ++ name role ++ "(" ++ genderStr ++ ")" ++ noteStr ++ clearStr
+    rawformat color role = colorStr ++ name role ++ "(" ++ genderStr ++ ")" ++ noteStr ++ clearStr
       where
         genderStr = case gender role of
             Just Male ->   "m"
@@ -44,10 +51,11 @@ instance Format Role where
             Just Neither -> "n"
             Nothing ->     "u"
         noteStr = maybe "" (\x -> concat ["[", x, "]"]) $ note role
-        colorStr = case gender role of
-            Just Female -> "\x1b[1;91m"
-            otherwist -> ""
-        clearStr = "\x1b[0m"
+        colorStr =
+            if color && gender role == Just Female
+                then "\x1b[1;91m"
+                else ""
+        clearStr = if color then "\x1b[0m" else ""
 
 -- Data type representing lines in script.
 data ScriptLine = StageDirection String | Scene String | Line Role String
@@ -58,12 +66,12 @@ instance Show ScriptLine where
     show (Line role line) = "(Line " ++ show role ++ " " ++ show line ++ ")"
 
 instance Format ScriptLine where
-    format (StageDirection dir) = intercalate "" ["(", dir, ")"]
-    format (Scene scene) = intercalate "" [colorStr, "[", scene, "]", clearStr]
+    rawformat _ (StageDirection dir) = intercalate "" ["(", dir, ")"]
+    rawformat color (Scene scene) = intercalate "" [colorStr, "[", scene, "]", clearStr]
       where
-        colorStr = "\x1b[1;94m"
-        clearStr = "\x1b[0m"
-    format (Line role line) = intercalate ": " [format role, line]
+        colorStr = if color then "\x1b[1;94m" else ""
+        clearStr = if color then "\x1b[0m" else ""
+    rawformat color (Line role line) = intercalate ": " [rawformat color role, line]
 
 -- Parse a role from a string.
 parseRole :: GenParser Char () Role
