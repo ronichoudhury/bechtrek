@@ -1,14 +1,18 @@
 import Control.Monad
 import Data.Bechdel
 import Data.Bechdel.Util
+import Data.Either
 import Data.Functor
 import Data.List
 import Data.List.Split
 import Data.String.Utils
+import Debug.Trace
+import System.Directory
 import System.Environment
 import System.Exit
 import System.IO
-import Text.XML.HXT.Core hiding (when)
+import System.Process
+import Text.XML.HXT.Core hiding (when, trace)
 import Text.HandsomeSoup
 import Text.ParserCombinators.Parsec
 
@@ -77,17 +81,47 @@ report (Right result) = do
     putStrLn $ format result
     return True
 
+edit :: Either ParseError ScriptLine -> String -> IO String
+edit (Left err) line = do
+    (path, h) <- openTempFile "/tmp" "bechedit.txt"
+    hPutStrLn h line
+    hPutStrLn h $ "# " ++ show err
+    hClose h
+    trace path (callCommand $ "vim " ++ path)
+    hh <- openFile path ReadMode
+    modified <- hGetLine hh
+    hClose hh
+    removeFile path
+    return modified
+
+parseLineWithCorrection :: String -> IO String
+parseLineWithCorrection line = do
+    let parsed = parseRawLine line
+    if (isLeft parsed)
+        then edit parsed line
+        else return line
+
 -- Main function: open the file, read its contents, parse into ScriptLines, and
 -- spit them back onto stdout.
 main :: IO ()
 main = do
+    args <- getArgs
+    when (null args) $ do
+        hPutStrLn stderr "usage: parsechakoteya <scriptfile>"
+        exitFailure
+    file <- openFile (head args) ReadMode
+    hSetEncoding file latin1
+    text <- hGetContents file
+
     -- Open the file, read its contents, and parse out the script lines from the
     -- HTML.
-    hSetEncoding stdin latin1
-    script <- readHTMLScript <$> getContents
+    script <- readHTMLScript text
+
 
     -- Extract the appropriate tags from the text.
-    scriptLines <- map parseRawLine . filter (not . null) . map (strip . unnewline) <$> script
+    lines <- sequence . map parseLineWithCorrection . filter (not . null) . map (strip . unnewline) $ script
+
+    let scriptLines = map parseRawLine lines
 
     -- Print out the script in standard format.
     good <- mapM report $ scriptLines
