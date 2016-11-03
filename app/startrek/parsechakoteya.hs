@@ -81,8 +81,10 @@ edit (Left err) line = do
     (path, h) <- openTempFile "/tmp" "bechedit.txt"
     hPutStrLn h line
     hPutStrLn h $ ""
-    hPutStrLn h $ "##### Edit the first line of this file to correct the parsing error #####"
-    hPutStrLn h $ "PARSE ERROR:"
+    hPutStrLn h $ "##########"
+    hPutStrLn h $ "Edit the first line of this file to correct the parsing error\n"
+    hPutStrLn h $ "Leave the first line completely blank to abort the program\n"
+    hPutStrLn h $ "The parse error was:"
     hPutStrLn h $ show err
     hClose h
 
@@ -92,6 +94,10 @@ edit (Left err) line = do
     modified <- hGetLine hh
     hClose hh
     removeFile path
+
+    when (null modified) $ do
+        hPutStrLn stderr $ "Blank line detected; aborting."
+        exitFailure
 
     return modified
 
