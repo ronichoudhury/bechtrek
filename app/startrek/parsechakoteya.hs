@@ -22,25 +22,20 @@ parseRawLine s = parse parser s s
   where
     parser = try stagedirParser <|> try sceneParser <|> try lineParser <|> try logParser
 
-    stagedirParser = try stagedirParserWhole <|> try stagedirParserMissingParen
+    stagedirParser = try stagedirParserWhole
 
     stagedirParserWhole = do
         char '('
         text <- manyTill anyChar (try $ lookAhead (char ')' >> spaces >> eof))
         return $ StageDirection text
 
-    stagedirParserMissingParen = do
-        char '('
-        text <- many anyChar
-        return $ StageDirection text
-
     sceneParser = do
-        text <- between (char '[' <|> char '{') (char ']' <|> char '}') (many $ noneOf "[]{}")
+        text <- between (char '[') (char ']') (many $ noneOf "]")
         return $ Scene text
 
     lineParser = do
         role <- parseRawRole
-        char ':' <|> char ';'
+        char ':'
         spaces
         line <- many anyChar
         return $ Line role line
@@ -57,9 +52,9 @@ parseRawLine s = parse parser s s
                                             isInfixOf "Log"]
 
     parseRawRole = do
-        name <- many $ noneOf ":;[{"
+        name <- many $ noneOf ":["
         spaces
-        note <- optionMaybe $ between (char '[' <|> char '{') (char ']' <|> char '[' <|> char '}') (many $ noneOf "[]{}")
+        note <- optionMaybe $ between (char '[') (char ']') (many $ noneOf "]")
         return $ Role name Nothing note
 
 -- Parse HTML text.
