@@ -80,20 +80,28 @@ edit :: Either ParseError ScriptLine -> String -> IO String
 edit (Left err) line = do
     (path, h) <- openTempFile "/tmp" "bechedit.txt"
     hPutStrLn h line
-    hPutStrLn h $ "# " ++ show err
+    hPutStrLn h $ ""
+    hPutStrLn h $ "##### Edit the first line of this file to correct the parsing error #####"
+    hPutStrLn h $ "PARSE ERROR:"
+    hPutStrLn h $ show err
     hClose h
-    trace path (callCommand $ "vim " ++ path)
+
+    callCommand $ "vim " ++ path
+
     hh <- openFile path ReadMode
     modified <- hGetLine hh
     hClose hh
     removeFile path
+
     return modified
 
+-- Parse the argument; if the parse fails, launch an editor to let the user
+-- correct the parse error, and loop until the string is corrected.
 parseLineWithCorrection :: String -> IO String
 parseLineWithCorrection line = do
     let parsed = parseRawLine line
     if (isLeft parsed)
-        then edit parsed line
+        then edit parsed line >>= parseLineWithCorrection
         else return line
 
 -- Main function: open the file, read its contents, parse into ScriptLines, and
