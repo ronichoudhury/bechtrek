@@ -67,14 +67,13 @@ extractScriptText html = runX $ html >>> css "table p font" //> getText
 -- Convenience function.
 readHTMLScript = extractScriptText . parseHTML
 
-report :: Either ParseError ScriptLine -> IO Bool
-report (Left parseError) = do
-    hPutStrLn stderr "ERROR-------"
-    hPutStrLn stderr $ show parseError
-    hFlush stderr
+report :: Handle -> Either ParseError ScriptLine -> IO Bool
+report handle (Left parseError) = do
+    hPutStrLn handle "ERROR-------"
+    hPutStrLn handle $ show parseError
     return False
-report (Right result) = do
-    putStrLn $ format result
+report handle (Right result) = do
+    hPutStrLn handle $ format result
     return True
 
 edit :: Either ParseError ScriptLine -> String -> IO String
@@ -132,12 +131,17 @@ stitch (s:ss) = stitch' s ss
 main :: IO ()
 main = do
     args <- getArgs
-    when (null args) $ do
-        hPutStrLn stderr "usage: parsechakoteya <scriptfile>"
+    when (length args < 2) $ do
+        hPutStrLn stderr "usage: parsechakoteya <scriptfile> <outputfile>"
         exitFailure
+
+    -- Open the input file for reading; grab its contents.
     file <- openFile (head args) ReadMode
     hSetEncoding file latin1
     text <- hGetContents file
+
+    -- Open the output file for writing.
+    out <- openFile (args !! 1) WriteMode
 
     -- Open the file, read its contents, and parse out the script lines from the
     -- HTML.
@@ -149,7 +153,7 @@ main = do
     let scriptLines = map parseRawLine lines
 
     -- Print out the script in standard format.
-    good <- mapM report $ scriptLines
+    good <- mapM (report out) $ scriptLines
     if all (== True) good
         then exitSuccess
         else exitFailure
