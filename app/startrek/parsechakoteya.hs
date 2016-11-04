@@ -62,7 +62,7 @@ parseRawLine s = parse parser s s
 parseHTML = readString [withParseHTML yes, withWarnings no]
 
 -- Extract all appropriate text nodes comprising script.
-extractScriptText html = runX $ html >>> css "table p font" //> getText
+extractScriptText html = runX $ html >>> css "table font" //> getText
 
 -- Convenience function.
 readHTMLScript = extractScriptText . parseHTML
