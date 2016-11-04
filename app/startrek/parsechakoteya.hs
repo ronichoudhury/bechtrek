@@ -5,6 +5,7 @@ import Data.Either
 import Data.Functor
 import Data.List
 import Data.List.Split
+import Data.Maybe
 import Data.String.Utils
 import Debug.Trace
 import System.Directory
@@ -83,7 +84,9 @@ edit (Left err) line = do
     hPutStrLn h $ ""
     hPutStrLn h $ "##########"
     hPutStrLn h $ "Edit the first line of this file to correct the parsing error\n"
-    hPutStrLn h $ "Leave the first line completely blank to abort the program\n"
+    hPutStrLn h $ "Write just the word \"join\" to join this line of text in its entirety to the previous line.\n"
+    hPutStrLn h $ "Write just the word \"exit\" to abandon processing this script.\n"
+    hPutStrLn h $ "----------"
     hPutStrLn h $ "The parse error was:"
     hPutStrLn h $ show err
     hClose h
@@ -95,11 +98,14 @@ edit (Left err) line = do
     hClose hh
     removeFile path
 
-    when (null modified) $ do
-        hPutStrLn stderr $ "Blank line detected; aborting."
+    when (modified == "exit") $ do
+        hPutStrLn stderr $ "exiting"
         exitFailure
 
-    return modified
+    let join = modified == "join"
+    let prefix = if join then "join: " else ""
+
+    return $ prefix ++ (if join then line else modified)
 
 -- Parse the argument; if the parse fails, launch an editor to let the user
 -- correct the parse error, and loop until the string is corrected.
@@ -109,6 +115,17 @@ parseLineWithCorrection line = do
     if (isLeft parsed)
         then edit parsed line >>= parseLineWithCorrection
         else return line
+
+-- Join all "join" lines to the preceding line.
+stitch :: [String] -> [String]
+stitch [] = []
+stitch (s:ss) = stitch' s ss
+  where
+    stitch' :: String -> [String] -> [String]
+    stitch' last [] = [last]
+    stitch' last (s:ss)
+      | "join:" `isPrefixOf` s = stitch' (last ++ (fromJust . stripPrefix "join:" $ s)) ss
+      | otherwise = last : stitch' s ss
 
 -- Main function: open the file, read its contents, parse into ScriptLines, and
 -- spit them back onto stdout.
@@ -126,9 +143,8 @@ main = do
     -- HTML.
     script <- readHTMLScript text
 
-
     -- Extract the appropriate tags from the text.
-    lines <- sequence . map parseLineWithCorrection . filter (not . null) . map (strip . unnewline) $ script
+    lines <- stitch <$> (sequence . map parseLineWithCorrection . filter (not . null) . map (strip . unnewline) $ script)
 
     let scriptLines = map parseRawLine lines
 
