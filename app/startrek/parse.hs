@@ -137,7 +137,7 @@ main :: IO ()
 main = do
     args <- getArgs
     when (length args < 2) $ do
-        hPutStrLn stderr "usage: parsechakoteya <scriptfile> <outputfile>"
+        hPutStrLn stderr "usage: parse <scriptfile> <outputfile>"
         exitFailure
 
     -- Open the input file for reading; grab its contents.
