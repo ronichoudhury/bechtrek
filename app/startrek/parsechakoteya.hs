@@ -61,6 +61,11 @@ parseRawLine s = parse parser s s
 -- Parse HTML text.
 parseHTML = readString [withParseHTML yes, withWarnings no]
 
+-- Get the episode title from the HTML.
+extractScriptTitle html = do
+    titleText <- head <$> (runX $ html >>> css "title" //> getText)
+    return $ strip . unnewline . intercalate "-" $ (tail $ splitOn "-" titleText)
+
 -- Extract all appropriate text nodes comprising script.
 extractScriptText html = runX $ html >>> css "table font" //> getText
 
@@ -145,12 +150,14 @@ main = do
 
     -- Open the file, read its contents, and parse out the script lines from the
     -- HTML.
+    title <- extractScriptTitle . parseHTML $ text
     script <- readHTMLScript text
 
     -- Extract the appropriate tags from the text.
     lines <- stitch <$> (sequence . map parseLineWithCorrection . filter (not . null) . map (strip . unnewline) $ script)
 
-    let scriptLines = map parseRawLine lines
+    -- Parse a script from the text, prepending a title record.
+    let scriptLines = (Right $ Title title) : map parseRawLine lines
 
     -- Print out the script in standard format.
     good <- mapM (report out) $ scriptLines
