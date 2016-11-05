@@ -58,12 +58,13 @@ instance Format Role where
         clearStr = if color then "\x1b[0m" else ""
 
 -- Data type representing lines in script.
-data ScriptLine = StageDirection String | Scene String | Line Role String
+data ScriptLine = StageDirection String | Scene String | Line Role String | Title String
 
 instance Show ScriptLine where
     show (StageDirection dir) = "(StageDirection " ++ show dir ++ ")"
     show (Scene scene) = "(Scene " ++ show scene ++ ")"
     show (Line role line) = "(Line " ++ show role ++ " " ++ show line ++ ")"
+    show (Title title) = "(Title " ++ show title ++ ")"
 
 instance Format ScriptLine where
     rawformat _ (StageDirection dir) = intercalate "" ["(", dir, ")"]
@@ -72,6 +73,10 @@ instance Format ScriptLine where
         colorStr = if color then "\x1b[1;94m" else ""
         clearStr = if color then "\x1b[0m" else ""
     rawformat color (Line role line) = intercalate ": " [rawformat color role, line]
+    rawformat color (Title title) = colorStr ++ "========== " ++ title ++ clearStr
+      where
+        colorStr = if color then "\x1b[1;91m" else ""
+        clearStr = if color then "\x1b[0m" else ""
 
 -- Parse a role from a string.
 parseRole :: GenParser Char () Role
@@ -90,7 +95,7 @@ parseRole = do
 
 -- Read a line of text into a ScriptLine.
 parseScriptLine' :: GenParser Char () ScriptLine
-parseScriptLine' = try parseLine <|> try parseScene <|> try parseStageDirection
+parseScriptLine' = try parseLine <|> try parseScene <|> try parseStageDirection <|> try parseTitle
 
 -- Parse a ScriptLine out of a line of dialogue.
 parseLine :: GenParser Char () ScriptLine
@@ -112,5 +117,12 @@ parseScene :: GenParser Char () ScriptLine
 parseScene = do
     text <- between (char '[') (char ']') (many $ noneOf "[]")
     return $ Scene text
+
+-- Parse a ScriptLine out of a title.
+parseTitle :: GenParser Char () ScriptLine
+parseTitle = do
+    string "========== "
+    title <- many1 anyChar
+    return $ Title title
 
 parseScriptLine = parse parseScriptLine' "(source)"

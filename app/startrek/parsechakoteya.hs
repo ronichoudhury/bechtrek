@@ -156,7 +156,8 @@ main = do
     -- Extract the appropriate tags from the text.
     lines <- stitch <$> (sequence . map parseLineWithCorrection . filter (not . null) . map (strip . unnewline) $ script)
 
-    let scriptLines = map parseRawLine lines
+    -- Parse a script from the text, prepending a title record.
+    let scriptLines = (Right $ Title title) : map parseRawLine lines
 
     -- Print out the script in standard format.
     good <- mapM (report out) $ scriptLines
