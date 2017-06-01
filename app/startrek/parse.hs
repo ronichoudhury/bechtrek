@@ -161,6 +161,7 @@ main = do
 
     -- Print out the script in standard format.
     good <- mapM (report out) $ scriptLines
+    hFlush out
     if all (== True) good
         then exitSuccess
         else exitFailure
