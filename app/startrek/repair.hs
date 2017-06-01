@@ -17,6 +17,18 @@ fillName l@(Line r@Role{name="UNKNOWN"} s) = do
     return $ Line r{name=name} s
 fillName r = return r
 
+-- Get a legal gender character
+getGenderChar :: IO Char
+getGenderChar = do
+  c <- head <$> getLine
+  if valid c
+    then return c
+    else do
+      hPutStr stderr $ "Illegal character for gender " ++ show c ++ " (should be m/f/n) - try again: "
+      getGenderChar
+ where
+  valid c = c `elem` "mfn"
+
 -- Ask the user for a gender if one is missing; use the map to store cached
 -- previous answers.
 fillGender :: M.Map String Gender -> ScriptLine -> IO (M.Map String Gender, ScriptLine)
@@ -27,7 +39,7 @@ fillGender cache l@(Line r@Role{gender=Nothing} s) = do
             hPutStrLn stderr $ format l
             hPutStr stderr "What is the role's gender? "
             hFlush stderr
-            g <- translate . head <$> getLine
+            g <- translate <$> getGenderChar
             let newCache = M.insert (name r) g cache
             return (newCache, Line r{gender=Just g} s)
   where
