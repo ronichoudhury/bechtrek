@@ -13,7 +13,7 @@ splitGroups _ [] = []
 splitGroups f xs = splitGroups' [] [] f xs
   where
     splitGroups' :: [[a]] -> [a] -> (a -> Bool) -> [a] -> [[a]]
-    splitGroups' accum current _ [] = reverse $ current:accum
+    splitGroups' accum current _ [] = reverse $ (reverse current:accum)
     splitGroups' accum current f (x:xs) = if f x
         then splitGroups' ((reverse current):accum) [x] f xs
         else splitGroups' accum (x:current) f xs

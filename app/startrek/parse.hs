@@ -1,7 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 import Control.Monad
+import Data.Aeson as A
+import Data.Aeson.Encode.Pretty as A
 import Data.Bechdel as B
 import Data.Bechdel.Script as S
 import Data.Bechdel.Util
+import qualified Data.ByteString.Lazy.Char8 as LT
 import Data.Either
 import Data.Functor
 import Data.List
@@ -57,7 +61,7 @@ parseRawLine s = parse parser s s
         name <- many $ noneOf ":["
         spaces
         note <- optionMaybe $ between (char '[') (char ']') (many $ noneOf "]")
-        return $ B.Role name Nothing note
+        return $ B.Role (strip name) Nothing note
 
 -- Parse HTML text.
 parseHTML = readString [withParseHTML yes, withWarnings no]
@@ -80,7 +84,40 @@ report handle (Left parseError) = do
     return False
 report handle (Right result) = do
     hPutStrLn handle $ format result
+    {-hPutStrLn handle $ show result-}
     return True
+
+isScene :: ScriptLine -> Bool
+isScene (B.Scene _) = True
+isScene _ = False
+
+convertJSON :: [ScriptLine] -> LT.ByteString
+convertJSON lines = json
+  where
+    all = splitGroups isScene lines
+    title = head all
+    scenes = tail all
+    sceneObj = map aggregate scenes
+
+    config = let spaces = Spaces 2
+                 order = (A.keyOrder ["name", "gender", "sceneDescription", "series", "title", "season", "episode"])
+                 format = confNumFormat A.defConfig
+                 trailing = confTrailingNewline A.defConfig
+             in Config spaces order format trailing
+    json = A.encodePretty' config sceneObj
+
+    aggregate :: [B.ScriptLine] -> S.Scene
+    aggregate ((B.Scene desc):lines) = S.Scene desc $ map convertLine lines
+    aggregate x = error $ "<<<" ++ show x ++ ">>>"
+
+    convertLine :: B.ScriptLine -> S.Line
+    convertLine (B.Line role line) = S.Dialog (S.Role (B.name role) (convertGender <$> B.gender role)) line
+    convertLine (B.StageDirection d) = S.StageDirection d
+
+    convertGender :: B.Gender -> S.Gender
+    convertGender B.Male = S.Male
+    convertGender B.Female = S.Female
+    convertGender B.Neither = S.Other
 
 edit :: Either ParseError ScriptLine -> String -> IO String
 edit (Left err) line = do
@@ -159,6 +196,8 @@ main = do
 
     -- Parse a script from the text, prepending a title record.
     let scriptLines = (Right $ Title title) : map parseRawLine lines
+
+    LT.putStrLn $ convertJSON (rights scriptLines)
 
     -- Print out the script in standard format.
     good <- mapM (report out) $ scriptLines
