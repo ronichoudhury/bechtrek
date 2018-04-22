@@ -8,36 +8,12 @@ import qualified Data.Text as T
 import Debug.Trace
 
 data Trek = TOS | TNG | DS9 | VOY | ENT | DSC deriving Show
-
-{-data Dialog = Dialog-}
-  {-{ role :: Role-}
-  {-, dialog :: String-}
-  {-} deriving Show-}
+$(deriveJSON defaultOptions ''Trek)
 
 data Role = Role { name :: String } deriving Show
-
-{-data StageDirection = StageDirection { stagedir :: String } deriving Show-}
+$(deriveJSON defaultOptions ''Role)
 
 data Line = Dialog { role :: String, dialog :: String } | StageDirection String deriving Show
-
-data Scene = Scene
-  { sceneDescription :: String
-  , lines :: [Line]
-  } deriving Show
-
-data Script = Script
-  { title :: String
-  , series :: Trek
-  , season :: Integer
-  , episode :: Integer
-  , scenes :: [Scene]
-  } deriving Show
-
-$(deriveJSON defaultOptions ''Role)
-{-$(deriveJSON defaultOptions ''Dialog)-}
-{-$(deriveJSON defaultOptions ''StageDirection)-}
-{-$(deriveJSON defaultOptions ''Line)-}
-
 instance FromJSON Line where
   parseJSON j = do
     o <- parseJSON j
@@ -53,6 +29,17 @@ instance ToJSON Line where
     ]
   toJSON (StageDirection s) = object ["stagedir" .= T.pack s]
 
+data Scene = Scene
+  { sceneDescription :: String
+  , lines :: [Line]
+  } deriving Show
 $(deriveJSON defaultOptions ''Scene)
+
+data Script = Script
+  { title :: String
+  , series :: Trek
+  , season :: Integer
+  , episode :: Integer
+  , scenes :: [Scene]
+  } deriving Show
 $(deriveJSON defaultOptions ''Script)
-$(deriveJSON defaultOptions ''Trek)
