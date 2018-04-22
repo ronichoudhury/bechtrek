@@ -100,7 +100,7 @@ convertJSON lines = json
     sceneObj = map aggregate scenes
 
     config = let spaces = Spaces 2
-                 order = (A.keyOrder ["name", "gender", "sceneDescription", "series", "title", "season", "episode"])
+                 order = (A.keyOrder ["role", "name", "gender", "note", "sceneDescription", "series", "title", "season", "episode"])
                  format = confNumFormat A.defConfig
                  trailing = confTrailingNewline A.defConfig
              in Config spaces order format trailing
@@ -111,7 +111,7 @@ convertJSON lines = json
     aggregate x = error $ "<<<" ++ show x ++ ">>>"
 
     convertLine :: B.ScriptLine -> S.Line
-    convertLine (B.Line role line) = S.Dialog (S.Role (B.name role) (convertGender <$> B.gender role)) line
+    convertLine (B.Line role line) = S.Dialog (S.Role (B.name role) (convertGender <$> B.gender role)) line (B.note role)
     convertLine (B.StageDirection d) = S.StageDirection d
 
     convertGender :: B.Gender -> S.Gender
