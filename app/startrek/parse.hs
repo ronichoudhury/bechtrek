@@ -90,20 +90,20 @@ isScene :: ScriptLine -> Bool
 isScene (B.Scene _) = True
 isScene _ = False
 
-convertJSON :: [ScriptLine] -> LT.ByteString
-convertJSON lines = json
+convertJSON :: String -> Trek -> Integer -> Integer -> [ScriptLine] -> LT.ByteString
+convertJSON title series season episode lines = json
   where
     all = splitGroups isScene lines
-    title = head all
-    scenes = tail all
-    sceneObj = map aggregate scenes
+    sceneData = tail all
+    scenes = map aggregate sceneData
+    script = Script title series season episode scenes
 
     config = let spaces = Spaces 2
                  order = (A.keyOrder ["role", "name", "gender", "note", "sceneDescription", "series", "title", "season", "episode"])
                  format = confNumFormat A.defConfig
                  trailing = confTrailingNewline A.defConfig
              in Config spaces order format trailing
-    json = A.encodePretty' config sceneObj
+    json = A.encodePretty' config script
 
     aggregate :: [B.ScriptLine] -> S.Scene
     aggregate ((B.Scene desc):lines) = S.Scene desc $ map convertLine lines
@@ -168,14 +168,42 @@ stitch (s:ss) = stitch' s ss
       | "join:" `isPrefixOf` s = stitch' (last ++ (fromJust . stripPrefix "join:" $ s)) ss
       | otherwise = last : stitch' s ss
 
+parseSeries :: String -> Maybe Trek
+parseSeries s = case s of
+  "TOS" -> Just TOS
+  "TNG" -> Just TNG
+  "DS9" -> Just DS9
+  "VOY" -> Just VOY
+  "ENT" -> Just ENT
+  "DSC" -> Just DSC
+  _ -> Nothing
+
 -- Main function: open the file, read its contents, parse into ScriptLines, and
 -- spit them back onto stdout.
 main :: IO ()
 main = do
     args <- getArgs
-    when (length args < 1) $ do
-        hPutStrLn stderr "usage: parse <scriptfile>"
+    when (length args < 4) $ do
+        hPutStrLn stderr "usage: parse <scriptfile> <series> <season> <episode>"
         exitFailure
+
+    let seriesArg = args !! 1
+    let series = parseSeries seriesArg
+    when (isNothing series) $ do
+      hPutStrLn stderr $ "error: series must be one of 'TOS', 'TNG', 'DS9', 'VOY', 'ENT', or 'DSC' (but was '" ++ seriesArg ++ "')"
+      exitFailure
+
+    let seasonArg = args !! 2
+    let season = maybeRead seasonArg :: Maybe Integer
+    when (isNothing season) $ do
+      hPutStrLn stderr $ "error: season must be an integer (but was '" ++ seasonArg ++ "')"
+      exitFailure
+
+    let episodeArg = args !! 3
+    let episode = maybeRead episodeArg :: Maybe Integer
+    when (isNothing episode) $ do
+      hPutStrLn stderr $ "error: episode must be an integer (but was '" ++ episodeArg ++ "')"
+      exitFailure
 
     -- Open the input file for reading; grab its contents.
     file <- openFile (head args) ReadMode
@@ -201,4 +229,4 @@ main = do
         exitFailure
 
     -- Convert to JSON and dump to stdout.
-    LT.putStrLn $ convertJSON (rights scriptLines)
+    LT.putStrLn $ convertJSON title (fromJust series) (fromJust season) (fromJust episode) (rights scriptLines)
