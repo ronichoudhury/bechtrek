@@ -1,5 +1,6 @@
 import Control.Monad
-import Data.Bechdel
+import Data.Bechdel as B
+import Data.Bechdel.Script as S
 import Data.Bechdel.Util
 import Data.Either
 import Data.Functor
@@ -28,11 +29,11 @@ parseRawLine s = parse parser s s
     stagedirParserWhole = do
         char '('
         text <- manyTill anyChar (try $ lookAhead (char ')' >> spaces >> eof))
-        return $ StageDirection text
+        return $ B.StageDirection text
 
     sceneParser = do
         text <- between (char '[') (char ']') (many $ noneOf "]")
-        return $ Scene text
+        return $ B.Scene text
 
     lineParser = do
         role <- parseRawRole
@@ -44,7 +45,7 @@ parseRawLine s = parse parser s s
     logParser = do
         text <- many anyChar
         if isLog text
-            then return $ Line (Role "UNKNOWN" Nothing Nothing) text
+            then return $ B.Line (B.Role "UNKNOWN" Nothing Nothing) text
             else fail "Could not parse"
       where
         isLog s = any (== True) $ map ($s) [isInfixOf "Star date",
@@ -56,7 +57,7 @@ parseRawLine s = parse parser s s
         name <- many $ noneOf ":["
         spaces
         note <- optionMaybe $ between (char '[') (char ']') (many $ noneOf "]")
-        return $ Role name Nothing note
+        return $ B.Role name Nothing note
 
 -- Parse HTML text.
 parseHTML = readString [withParseHTML yes, withWarnings no]
