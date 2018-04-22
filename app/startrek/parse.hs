@@ -84,7 +84,6 @@ report handle (Left parseError) = do
     return False
 report handle (Right result) = do
     hPutStrLn handle $ format result
-    {-hPutStrLn handle $ show result-}
     return True
 
 isScene :: ScriptLine -> Bool
@@ -174,17 +173,14 @@ stitch (s:ss) = stitch' s ss
 main :: IO ()
 main = do
     args <- getArgs
-    when (length args < 2) $ do
-        hPutStrLn stderr "usage: parse <scriptfile> <outputfile>"
+    when (length args < 1) $ do
+        hPutStrLn stderr "usage: parse <scriptfile>"
         exitFailure
 
     -- Open the input file for reading; grab its contents.
     file <- openFile (head args) ReadMode
     hSetEncoding file latin1
     text <- hGetContents file
-
-    -- Open the output file for writing.
-    out <- openFile (args !! 1) WriteMode
 
     -- Open the file, read its contents, and parse out the script lines from the
     -- HTML.
@@ -197,10 +193,12 @@ main = do
     -- Parse a script from the text, prepending a title record.
     let scriptLines = (Right $ Title title) : map parseRawLine lines
 
-    LT.putStrLn $ convertJSON (rights scriptLines)
+    -- Verify that parsing went all right.
+    let errors = lefts scriptLines
+    when (not $ null errors) $ do
+        hPutStrLn stderr "ERROR-------"
+        mapM (hPutStrLn stderr . show) errors
+        exitFailure
 
-    -- Print out the script in standard format.
-    good <- mapM (report out) $ scriptLines
-    if all (== True) good
-        then exitSuccess
-        else exitFailure
+    -- Convert to JSON and dump to stdout.
+    LT.putStrLn $ convertJSON (rights scriptLines)
