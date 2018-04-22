@@ -10,10 +10,13 @@ import Debug.Trace
 data Trek = TOS | TNG | DS9 | VOY | ENT | DSC deriving Show
 $(deriveJSON defaultOptions ''Trek)
 
-data Role = Role { name :: String } deriving Show
+data Gender = Male | Female | Other deriving Show
+$(deriveJSON defaultOptions ''Gender)
+
+data Role = Role { name :: String, gender :: Maybe Gender } deriving Show
 $(deriveJSON defaultOptions ''Role)
 
-data Line = Dialog { role :: String, dialog :: String } | StageDirection String deriving Show
+data Line = Dialog { role :: Role, dialog :: String } | StageDirection String deriving Show
 instance FromJSON Line where
   parseJSON j = do
     o <- parseJSON j
