@@ -10,10 +10,6 @@ import qualified Data.ByteString.Char8 as T
 
 script = "{\"series\": \"TNG\", \"title\": \"Title\", \"season\": 4, \"episode\": 7, \"scenes\": [{\"sceneDescription\": \"Stuff happening\", \"lines\": [{\"dialog\": {\"role\": \"Picard\", \"dialog\": \"Engage!\"}}, {\"stagedir\": \"Enterprise leaps to warp\"}]}]}"
 
-fromRight :: b -> Either a b -> b
-fromRight _ (Right x) = x
-fromRight def (Left _) = def
-
 yaml input = fromRight undefined $ (decodeEither input :: Either String Script)
 
 main = do
