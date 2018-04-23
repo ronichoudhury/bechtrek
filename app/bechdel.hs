@@ -1,52 +1,52 @@
 import Control.Monad
-import Data.Bechdel
+import Data.Aeson as A
+import Data.Aeson.Encode.Pretty as A
+import Data.Bechdel.Script as S
 import Data.Either
 import Data.Functor
 import Data.List.Split
-import qualified Data.Set as S
+import qualified Data.Set as Set
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.Encoding as T
 import Data.Typeable
 import System.Environment
 import System.Exit
 import System.IO
 
--- Scene detector, for use in chunking the script up into scenes.
-isScene :: ScriptLine -> Bool
-isScene (Scene{}) = True
-isScene _ = False
-
 -- Female (and, consequently, line) detector, for use in counting the number of
 -- female characters in a scene.
-isFemale :: ScriptLine -> Bool
-isFemale (Line r@Role{gender=Just Female} _) = True
+isFemale :: S.Line -> Bool
+isFemale (S.Dialog r@S.Role{S.gender=Just S.Female} _ _) = True
 isFemale _ = False
 
 -- Extract a role from a ScriptLine (dangerous function but we only call it on a
 -- list that is known to contain only Line objects).
-role :: ScriptLine -> Role
-role (Line r _) = r
+getRole :: S.Line -> S.Role
+getRole (Dialog r _ _) = r
+getRole _ = error "impossible"
 
 -- Counter for number of distinct, female roles in a scene.
-countDistinct :: [ScriptLine] -> Int
-countDistinct lines = countDistinct' lines S.empty 0
+countDistinct :: [S.Line] -> Int
+countDistinct lines = countDistinct' lines Set.empty 0
   where
-    countDistinct' :: [ScriptLine] -> S.Set String -> Int -> Int
+    countDistinct' :: [S.Line] -> Set.Set String -> Int -> Int
     countDistinct' [] _ c = c
     countDistinct' (x:xs) s c =
-        if isFemale x && S.notMember rolename s
-            then countDistinct' xs (S.insert rolename s) (c + 1)
+        if isFemale x && Set.notMember rolename s
+            then countDistinct' xs (Set.insert rolename s) (c + 1)
             else countDistinct' xs s c
       where
         rolename = name . role $ x
 
 -- This function filters away all scenes that have fewer than two female
 -- characters, and asks the user whether it passes the Bechdel test.
-askBechdel :: [ScriptLine] -> IO Bool
+askBechdel :: [S.Line] -> IO Bool
 askBechdel scene = do
     let numFemale = countDistinct $ filter isFemale scene
     if numFemale < 2
         then return False
         else do
-            mapM_ (hPutStrLn stderr . cformat) scene
+            mapM_ (hPutStrLn stderr . show) scene
             hPutStr stderr "\nDoes this scene pass the Bechdel test? "
             hFlush stderr
             answer <- getLine
@@ -62,26 +62,21 @@ main = do
     when (null args) $ do
         hPutStrLn stderr "usage: bechdel <scriptfile>"
         exitFailure
-    text <- lines <$> readFile (head args)
+    text <- readFile $ head args
 
-    -- Parse into ScriptLines
-    let scriptParse = map parseScriptLine text
-
-    -- Check for well-formedness of the input.
-    let bad = filter (isLeft . fst) $ zip scriptParse text
-    unless (null bad) $ do
-        hPutStrLn stderr "Error - badly formatted script line:"
-        hPutStrLn stderr (snd . head $ bad)
+    -- Parse the JSON.
+    let parse = A.eitherDecode $ (T.encodeUtf8 . T.pack) text :: Either String S.Script
+    when (isLeft parse) $ do
+        hPutStrLn stderr $ "error parsing JSON: " ++ (fromLeft undefined parse)
         exitFailure
 
-    -- Extract the actual ScriptLine objects.
-    let script = rights scriptParse
+    let script = fromRight undefined parse
 
     -- Split the script lines into groupings headed by a Scene.
-    let scenes = split (keepDelimsL $ whenElt isScene) script
+    let lines = map S.lines $ S.scenes script
 
     -- Ask the user to tell if each scene passes Bechdel or not.
-    results <- mapM askBechdel scenes
+    results <- mapM askBechdel lines
 
     -- Add up the results.
     let score = sum $ map (\x -> if x then 1 else 0) results
