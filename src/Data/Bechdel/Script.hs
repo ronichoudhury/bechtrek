@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
 module Data.Bechdel.Script where
 import Data.Aeson
+import Data.Aeson.Encode.Pretty
 import Data.Aeson.Types
 import Data.Aeson.TH
+import qualified Data.ByteString.Lazy.Char8 as LT
 import Data.HashMap.Lazy
 import qualified Data.Text as T
 import Debug.Trace
@@ -17,21 +19,7 @@ data Role = Role { name :: String, gender :: Maybe Gender } deriving Show
 $(deriveJSON defaultOptions ''Role)
 
 data Line = Dialog { role :: Role, dialog :: String, note :: Maybe String } | StageDirection String deriving Show
-instance FromJSON Line where
-  parseJSON j = do
-    o <- parseJSON j
-    case toList (o :: Object) of
-      [("dialog", Object o')] -> Dialog <$> o' .: "role" <*> o' .: "dialog" <*> o' .: "note"
-      [("stagedir", o')] -> StageDirection <$> parseJSON o'
-      _ -> fail "Line: unexpected format"
-
-instance ToJSON Line where
-  toJSON d@Dialog{} = object [
-    "role" .= role d,
-    "dialog" .= dialog d,
-    "note" .= note d
-    ]
-  toJSON (StageDirection s) = object ["stagedir" .= T.pack s]
+$(deriveJSON defaultOptions ''Line)
 
 data Scene = Scene
   { sceneDescription :: String
@@ -47,3 +35,12 @@ data Script = Script
   , scenes :: [Scene]
   } deriving Show
 $(deriveJSON defaultOptions ''Script)
+
+dumps :: Script -> LT.ByteString
+dumps script = encodePretty' config script
+  where
+    config = let spaces = Spaces 2
+                 order = (keyOrder ["role", "name", "gender", "note", "sceneDescription", "series", "title", "season", "episode"])
+                 format = confNumFormat defConfig
+                 trailing = confTrailingNewline defConfig
+             in Config spaces order format trailing
