@@ -26,50 +26,67 @@ fillName l@(S.Dialog r@S.Role{S.name="UNKNOWN"} d n) = do
     return $ S.Dialog r{S.name=name} d n
 fillName r = return r
 
--- Replace scenes
-replaceScenes :: [S.Scene] -> (S.Line -> IO S.Line) -> IO [S.Scene]
-replaceScenes [] _ = return []
-replaceScenes (s:ss) f = do
-    newlines <- mapM f (S.lines s)
-    (s{S.lines=newlines}:) <$> replaceScenes ss f
+-- Replace unknown names interactively.
+replaceNames :: [S.Scene] -> IO [S.Scene]
+replaceNames [] = return []
+replaceNames (s:ss) = do
+    newlines <- mapM fillName (S.lines s)
+    (s{S.lines=newlines}:) <$> replaceNames ss
 
 -- Ask the user for a gender if one is missing; use the map to store cached
 -- previous answers.
-{-fillGender :: M.Map String Gender -> ScriptLine -> IO (M.Map String Gender, ScriptLine)-}
-{-fillGender cache l@(Line r@Role{gender=Nothing} s) = do-}
-    {-case M.lookup (name r) cache of-}
-        {-Just g  -> return (cache, Line r{gender=Just g} s)-}
-        {-Nothing -> do-}
-            {-hPutStrLn stderr $ format l-}
-            {-hPutStr stderr "What is the role's gender? "-}
-            {-hFlush stderr-}
-            {-g <- translate . head <$> getLine-}
-            {-let newCache = M.insert (name r) g cache-}
-            {-return (newCache, Line r{gender=Just g} s)-}
-  {-where-}
-    {-translate :: Char -> Gender-}
-    {-translate 'm' = Male-}
-    {-translate 'f' = Female-}
-    {-translate 'n' = Neither-}
-    {-translate c = error $ "Illegal character for gender: " ++ show c-}
-{-fillGender cache l@(Line r@Role{gender=Just g} s) = return (M.insert (name r) g cache, l)-}
-{-fillGender cache l = return (cache, l)-}
+fillGender :: M.Map String S.Gender -> S.Line -> IO (M.Map String S.Gender, S.Line)
+fillGender cache l@(S.Dialog r@S.Role{S.gender=Nothing} s n) = do
+    case M.lookup (S.name r) cache of
+        Just g  -> return (cache, S.Dialog r{S.gender=Just g} s n)
+        Nothing -> do
+            hPutStrLn stderr $ render l
+            hPutStr stderr "What is the role's gender? "
+            hFlush stderr
+            g <- translate . head <$> getLine
+            let newCache = M.insert (S.name r) g cache
+            return (newCache, S.Dialog r{S.gender=Just g} s n)
+  where
+    translate :: Char -> S.Gender
+    translate 'm' = S.Male
+    translate 'f' = S.Female
+    translate 'o' = S.Other
+    translate c = error $ "Gender must be one of 'm', 'f', or 'o' (was '" ++ show c ++ "')"
+fillGender cache l@(S.Dialog r@S.Role{S.gender=Just g} s n) = return (M.insert (S.name r) g cache, l)
+fillGender cache l = return (cache, l)
+
+replaceGenders :: [S.Scene] -> IO [S.Scene]
+replaceGenders = go (M.fromList [])
+  where
+    go :: M.Map String S.Gender -> [S.Scene] -> IO [S.Scene]
+    go _ [] = return []
+    go cache (s:ss) = do
+        (newcache, newlines) <- fillGenders cache $ S.lines s
+        rest <- go newcache ss
+        return $ s{S.lines=newlines} : rest
+
+    fillGenders :: M.Map String S.Gender -> [S.Line] -> IO (M.Map String S.Gender, [S.Line])
+    fillGenders cache [] = return (cache, [])
+    fillGenders cache (l:ll) = do
+        (newcache, newline) <- fillGender cache l
+        (newercache, rest) <- fillGenders newcache ll
+        return $ (newercache, newline : rest)
 
 -- Apply fillGender to a list of ScriptLines, threading the evolving cache
 -- through the invocations.
 --
 -- TODO: replace this one-off mechanism with a use of StateT monad.
-{-fillGenders :: [ScriptLine] -> IO [ScriptLine]-}
-{-fillGenders = go (M.fromList [])-}
-  {-where-}
-    {-go :: M.Map String Gender -> [ScriptLine] -> IO [ScriptLine]-}
-    {-go _ [] = return []-}
-    {-go cache (x:xs) = do-}
-        {-result <- fillGender cache x-}
-        {-let newCache = fst result-}
-        {-let value = snd result-}
-        {-rest <- go newCache xs-}
-        {-return $ value : rest-}
+fillGenders :: [S.Line] -> IO [S.Line]
+fillGenders = go (M.fromList [])
+  where
+    go :: M.Map String S.Gender -> [S.Line] -> IO [S.Line]
+    go _ [] = return []
+    go cache (x:xs) = do
+        result <- fillGender cache x
+        let newCache = fst result
+        let value = snd result
+        rest <- go newCache xs
+        return $ value : rest
 
 main :: IO ()
 main = do
@@ -88,12 +105,11 @@ main = do
 
     let script = fromRight undefined parse
 
-    -- Find script lines with characters with unknown names.
-    namedScenes <- replaceScenes (S.scenes script) fillName
-    let filledScript = script{S.scenes=namedScenes}
+    -- Find script lines with characters with unknown names and genders, and
+    -- fill them in interactively.
+    namedScenes <- replaceNames (S.scenes script)
+    genderedScenes <- replaceGenders namedScenes
+    let filledScript = script{S.scenes=genderedScenes}
 
-    -- Find script lines with characters with unknown gender.
-    {-genderedScenes <- replaceScenes namedScenes fillGender-}
-    {-let filledScript = script{S.scenes=genderedScenes}-}
-
+    -- Dump the result to JSON.
     LT.putStrLn $ S.dumps filledScript
