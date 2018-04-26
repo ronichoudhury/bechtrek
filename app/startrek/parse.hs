@@ -183,8 +183,8 @@ parseSeries s = case s of
 main :: IO ()
 main = do
     args <- getArgs
-    when (length args < 4) $ do
-        hPutStrLn stderr "usage: parse <scriptfile> <series> <season> <episode>"
+    when (length args < 5) $ do
+        hPutStrLn stderr "usage: parse <scriptfile> <series> <season> <episode> <outfile>"
         exitFailure
 
     let seriesArg = args !! 1
@@ -204,6 +204,8 @@ main = do
     when (isNothing episode) $ do
       hPutStrLn stderr $ "error: episode must be an integer (but was '" ++ episodeArg ++ "')"
       exitFailure
+
+    let outFile = args !! 4
 
     -- Open the input file for reading; grab its contents.
     file <- openFile (head args) ReadMode
@@ -228,5 +230,7 @@ main = do
         mapM (hPutStrLn stderr . show) errors
         exitFailure
 
-    -- Convert to JSON and dump to stdout.
-    LT.putStrLn $ convertJSON title (fromJust series) (fromJust season) (fromJust episode) (rights scriptLines)
+    -- Convert to JSON and dump to output file.
+    out <- openFile outFile WriteMode
+    LT.hPutStrLn out $ convertJSON title (fromJust series) (fromJust season) (fromJust episode) (rights scriptLines)
+    hClose out
