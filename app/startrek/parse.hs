@@ -1,6 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 import Control.Monad
-import Data.Bechdel
+import Data.Aeson as A
+import Data.Aeson.Encode.Pretty as A
+import Data.Bechdel as B
+import Data.Bechdel.Script as S
 import Data.Bechdel.Util
+import qualified Data.ByteString.Lazy.Char8 as LT
 import Data.Either
 import Data.Functor
 import Data.List
@@ -28,11 +33,11 @@ parseRawLine s = parse parser s s
     stagedirParserWhole = do
         char '('
         text <- manyTill anyChar (try $ lookAhead (char ')' >> spaces >> eof))
-        return $ StageDirection text
+        return $ B.StageDirection text
 
     sceneParser = do
         text <- between (char '[') (char ']') (many $ noneOf "]")
-        return $ Scene text
+        return $ B.Scene text
 
     lineParser = do
         role <- parseRawRole
@@ -44,7 +49,7 @@ parseRawLine s = parse parser s s
     logParser = do
         text <- many anyChar
         if isLog text
-            then return $ Line (Role "UNKNOWN" Nothing Nothing) text
+            then return $ B.Line (B.Role "UNKNOWN" Nothing Nothing) text
             else fail "Could not parse"
       where
         isLog s = any (== True) $ map ($s) [isInfixOf "Star date",
@@ -56,7 +61,7 @@ parseRawLine s = parse parser s s
         name <- many $ noneOf ":["
         spaces
         note <- optionMaybe $ between (char '[') (char ']') (many $ noneOf "]")
-        return $ Role name Nothing note
+        return $ B.Role (strip name) Nothing note
 
 -- Parse HTML text.
 parseHTML = readString [withParseHTML yes, withWarnings no]
@@ -80,6 +85,38 @@ report handle (Left parseError) = do
 report handle (Right result) = do
     hPutStrLn handle $ format result
     return True
+
+isScene :: ScriptLine -> Bool
+isScene (B.Scene _) = True
+isScene _ = False
+
+convertJSON :: String -> Trek -> Integer -> Integer -> [ScriptLine] -> LT.ByteString
+convertJSON title series season episode lines = json
+  where
+    all = splitGroups isScene lines
+    sceneData = tail all
+    scenes = map aggregate sceneData
+    script = Script title series season episode scenes
+
+    config = let spaces = Spaces 2
+                 order = (A.keyOrder ["role", "name", "gender", "note", "sceneDescription", "series", "title", "season", "episode"])
+                 format = confNumFormat A.defConfig
+                 trailing = confTrailingNewline A.defConfig
+             in Config spaces order format trailing
+    json = A.encodePretty' config script
+
+    aggregate :: [B.ScriptLine] -> S.Scene
+    aggregate ((B.Scene desc):lines) = S.Scene desc $ map convertLine lines
+    aggregate x = error $ "<<<" ++ show x ++ ">>>"
+
+    convertLine :: B.ScriptLine -> S.Line
+    convertLine (B.Line role line) = S.Dialog (S.Role (B.name role) (convertGender <$> B.gender role)) line (B.note role)
+    convertLine (B.StageDirection d) = S.StageDirection d
+
+    convertGender :: B.Gender -> S.Gender
+    convertGender B.Male = S.Male
+    convertGender B.Female = S.Female
+    convertGender B.Neither = S.Other
 
 edit :: Either ParseError ScriptLine -> String -> IO String
 edit (Left err) line = do
@@ -131,22 +168,49 @@ stitch (s:ss) = stitch' s ss
       | "join:" `isPrefixOf` s = stitch' (last ++ (fromJust . stripPrefix "join:" $ s)) ss
       | otherwise = last : stitch' s ss
 
+parseSeries :: String -> Maybe Trek
+parseSeries s = case s of
+  "TOS" -> Just TOS
+  "TNG" -> Just TNG
+  "DS9" -> Just DS9
+  "VOY" -> Just VOY
+  "ENT" -> Just ENT
+  "DSC" -> Just DSC
+  _ -> Nothing
+
 -- Main function: open the file, read its contents, parse into ScriptLines, and
 -- spit them back onto stdout.
 main :: IO ()
 main = do
     args <- getArgs
-    when (length args < 2) $ do
-        hPutStrLn stderr "usage: parse <scriptfile> <outputfile>"
+    when (length args < 5) $ do
+        hPutStrLn stderr "usage: parse <scriptfile> <series> <season> <episode> <outfile>"
         exitFailure
+
+    let seriesArg = args !! 1
+    let series = parseSeries seriesArg
+    when (isNothing series) $ do
+      hPutStrLn stderr $ "error: series must be one of 'TOS', 'TNG', 'DS9', 'VOY', 'ENT', or 'DSC' (but was '" ++ seriesArg ++ "')"
+      exitFailure
+
+    let seasonArg = args !! 2
+    let season = maybeRead seasonArg :: Maybe Integer
+    when (isNothing season) $ do
+      hPutStrLn stderr $ "error: season must be an integer (but was '" ++ seasonArg ++ "')"
+      exitFailure
+
+    let episodeArg = args !! 3
+    let episode = maybeRead episodeArg :: Maybe Integer
+    when (isNothing episode) $ do
+      hPutStrLn stderr $ "error: episode must be an integer (but was '" ++ episodeArg ++ "')"
+      exitFailure
+
+    let outFile = args !! 4
 
     -- Open the input file for reading; grab its contents.
     file <- openFile (head args) ReadMode
     hSetEncoding file latin1
     text <- hGetContents file
-
-    -- Open the output file for writing.
-    out <- openFile (args !! 1) WriteMode
 
     -- Open the file, read its contents, and parse out the script lines from the
     -- HTML.
@@ -159,8 +223,14 @@ main = do
     -- Parse a script from the text, prepending a title record.
     let scriptLines = (Right $ Title title) : map parseRawLine lines
 
-    -- Print out the script in standard format.
-    good <- mapM (report out) $ scriptLines
-    if all (== True) good
-        then exitSuccess
-        else exitFailure
+    -- Verify that parsing went all right.
+    let errors = lefts scriptLines
+    when (not $ null errors) $ do
+        hPutStrLn stderr "ERROR-------"
+        mapM (hPutStrLn stderr . show) errors
+        exitFailure
+
+    -- Convert to JSON and dump to output file.
+    out <- openFile outFile WriteMode
+    LT.hPutStrLn out $ convertJSON title (fromJust series) (fromJust season) (fromJust episode) (rights scriptLines)
+    hClose out
